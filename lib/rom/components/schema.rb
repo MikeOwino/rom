@@ -10,15 +10,17 @@ module ROM
     class Schema < Core
       # @api private
       option :name, type: Types.Instance(ROM::Relation::Name), default: -> {
-        ROM::Relation::Name[config.id, config.dataset]
+        ROM::Relation::Name[config.relation, config.dataset]
       }
 
       # @api public
       def build
         if view?
-          resolver.schemas[config.relation].instance_eval(&block)
+          registry.schemas[config.relation].instance_eval(&block)
         else
-          schema = config.constant.define(name, **config, inferrer: inferrer, resolver: resolver)
+          schema = config.constant.define(
+            name, **config, **config.options, inferrer: inferrer, registry: registry
+          )
 
           if gateway?
             schema.finalize_attributes!(gateway: gateway)
@@ -43,6 +45,11 @@ module ROM
       # @api private
       def adapter
         config.adapter
+      end
+
+      # @api private
+      def relation
+        config.relation
       end
 
       # @api private

@@ -11,6 +11,7 @@ module ROM
     datasets
     schemas
     relations
+    views
     associations
     mappers
     commands
@@ -115,6 +116,16 @@ module ROM
       super("#{klass.inspect} relation is missing schema definition")
     end
   end
+
+  MISSING_ELEMENT_ERRORS = {
+    gateways: GatewayMissingError,
+    schemas: SchemaMissingError,
+    datasets: DatasetMissingError,
+    relations: RelationMissingError,
+    associations: RelationMissingError,
+    commands: CommandNotFoundError,
+    mappers: MapperMissingError
+  }.freeze
 
   DuplicateConfigurationError = Class.new(StandardError)
   DuplicateContainerError = Class.new(StandardError)

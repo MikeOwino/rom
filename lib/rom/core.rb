@@ -11,6 +11,7 @@ require_relative "components/gateway"
 require_relative "components/dataset"
 require_relative "components/schema"
 require_relative "components/relation"
+require_relative "components/view"
 require_relative "components/association"
 require_relative "components/command"
 require_relative "components/mapper"
@@ -18,12 +19,24 @@ require_relative "components/mapper"
 # Core plugins
 require_relative "plugins"
 
+# Set up ROM
+#
+# @api public
+def ROM(*args, &block)
+  if block
+    ROM.setup(*args, &block)
+  else
+    ROM::Setup.new(*args)
+  end
+end
+
 # Global ROM interface for core setup
 #
 # @api public
 module ROM
   extend Global
-  extend self
+
+  module_function
 
   # Global component setup
   #
@@ -69,6 +82,7 @@ module ROM
     register :dataset, Components::Dataset
     register :schema, Components::Schema
     register :relation, Components::Relation
+    register :view, Components::View
     register :association, Components::Association
     register :command, Components::Command
     register :mapper, Components::Mapper
@@ -102,6 +116,7 @@ module ROM
     register :timestamps, ROM::Plugins::Schema::Timestamps, type: :schema
     register :registry_reader, ROM::Plugins::Relation::RegistryReader, type: :relation
     register :instrumentation, ROM::Plugins::Relation::Instrumentation, type: :relation
+    register :changeset, ROM::Plugins::Relation::Changeset, type: :relation
     register :schema, ROM::Plugins::Command::Schema, type: :command
     register :timestamps, ROM::Plugins::Command::Timestamps, type: :command
   end

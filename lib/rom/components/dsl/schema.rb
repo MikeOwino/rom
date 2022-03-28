@@ -38,35 +38,48 @@ module ROM
         # @api public
         def primary_key(*names)
           names.each do |name|
-            attr_index[name][:type] = attr_index[name][:type].meta(primary_key: true)
+            attributes[name][:type] = attributes[name][:type].meta(primary_key: true)
           end
           self
         end
 
         # @api private
         def call
-          # Enable available plugin's
-          plugins.each do |plugin|
-            plugin.enable(self) unless plugin.enabled?
-          end
+          # Evaluate block only if it's not a schema defined by Relation.view DSL
+          instance_eval(&block) if block && !config.view
 
-          instance_eval(&block) if block
-
-          # Apply plugin defaults
-          plugins.each do |plugin|
-            plugin.apply_to(self) unless plugin.applied?
+          enabled_plugins.each_value do |plugin|
+            plugin.apply unless plugin.applied?
           end
 
           configure
 
-          components.add(key, config: config)
+          components.add(key, config: config, block: config.view ? block : nil)
         end
 
         # @api private
+        # rubocop:disable Metrics/AbcSize
         def configure
           config.update(attributes: attributes.values)
+
+          # TODO: make this simpler
+          config.update(
+            relation: relation_id,
+            inferrer: config.inferrer.with(enabled: config.infer)
+          )
+
+          if !view? && relation?
+            config.join!({namespace: relation_id}, :right) if config.id != relation_id
+
+            provider.config.component.update(dataset: config.dataset) if config.dataset
+            provider.config.component.update(id: config.as) if config.as
+          end
+
+          provider.config.schema.infer = config.infer
+
           super
         end
+        # rubocop:enable Metrics/AbcSize
 
         private
 
@@ -98,13 +111,16 @@ module ROM
             .compact
             .to_h
 
+          # TODO: this should be probably moved to rom/compat
+          source = ROM::Relation::Name[relation_id, config.dataset]
+
           base =
             if options[:read]
-              type.meta(source: relation, read: options[:read])
+              type.meta(source: source, read: options[:read])
             elsif type.optional? && type.meta[:read]
-              type.meta(source: relation, read: type.meta[:read].optional)
+              type.meta(source: source, read: type.meta[:read].optional)
             else
-              type.meta(source: relation)
+              type.meta(source: source)
             end
 
           if meta.empty?
@@ -112,6 +128,21 @@ module ROM
           else
             base.meta(meta)
           end
+        end
+
+        # @api private
+        def relation_id
+          relation? ? provider.config.component.id : config.id
+        end
+
+        # @api private
+        def relation?
+          provider.config.component.type == :relation
+        end
+
+        # @api private
+        def view?
+          config.view.equal?(true)
         end
       end
     end

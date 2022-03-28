@@ -14,26 +14,17 @@ module ROM
       #
       # @api public
       def build
-        constant.use(:registry_reader, relations: resolver.relation_ids)
+        constant.use(:changeset)
+        constant.use(:registry_reader, relations: registry.relation_ids)
 
-        trigger("relations.class.ready", relation: constant, adapter: adapter)
+        # Define view methods if there are any registered view components for this relation
+        local_components.views(relation_id: id).each do |view|
+          view.define(constant)
+        end
 
         apply_plugins
 
-        relation = constant.new(inflector: inflector, resolver: resolver, **plugin_options)
-
-        trigger(
-          "relations.schema.set",
-          schema: relation.schema,
-          adapter: adapter,
-          gateway: config[:gateway],
-          relation: constant,
-          resolver: resolver
-        )
-
-        trigger("relations.object.registered", resolver: resolver, relation: relation)
-
-        relation
+        constant.new(inflector: inflector, registry: registry, **plugin_options)
       end
 
       # @api public

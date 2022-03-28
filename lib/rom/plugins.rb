@@ -8,6 +8,7 @@ require "rom/plugin"
 require "rom/plugins/dsl"
 require "rom/plugins/relation/registry_reader"
 require "rom/plugins/relation/instrumentation"
+require "rom/plugins/relation/changeset"
 require "rom/plugins/command/schema"
 require "rom/plugins/command/timestamps"
 require "rom/plugins/schema/timestamps"
@@ -81,6 +82,7 @@ module ROM
           end
         end
       end
+      alias_method :[], :fetch
 
       # @api private
       def key?(name)

@@ -6,6 +6,7 @@ require "rom/components/dsl/gateway"
 require "rom/components/dsl/dataset"
 require "rom/components/dsl/schema"
 require "rom/components/dsl/relation"
+require "rom/components/dsl/view"
 require "rom/components/dsl/association"
 require "rom/components/dsl/command"
 require "rom/components/dsl/mapper"
@@ -69,6 +70,58 @@ module ROM
       # @api public
       def relation(id, dataset: id, **options, &block)
         __dsl__(DSL::Relation, id: id, dataset: dataset, **options, &block)
+      end
+
+      # Define a relation view with a specific schema
+      #
+      # This method should only be used in cases where a given adapter doesn't
+      # support automatic schema projection at run-time.
+      #
+      # @overload view(name, schema, &block)
+      #   @example View with the canonical schema
+      #     class Users < ROM::Relation[:sql]
+      #       view(:listing, schema) do
+      #         order(:name)
+      #       end
+      #     end
+      #
+      #   @example View with a projected schema
+      #     class Users < ROM::Relation[:sql]
+      #       view(:listing, schema.project(:id, :name)) do
+      #         order(:name)
+      #       end
+      #     end
+      #
+      # @overload view(name, &block)
+      #   @example View with the canonical schema and arguments
+      #     class Users < ROM::Relation[:sql]
+      #       view(:by_name) do |name|
+      #         where(name: name)
+      #       end
+      #     end
+      #
+      #   @example View with projected schema and arguments
+      #     class Users < ROM::Relation[:sql]
+      #       view(:by_name) do
+      #         schema { project(:id, :name) }
+      #         relation { |name| where(name: name) }
+      #       end
+      #     end
+      #
+      #   @example View with a schema extended with foreign attributes
+      #     class Users < ROM::Relation[:sql]
+      #       view(:index) do
+      #         schema { append(relations[:tasks][:title]) }
+      #         relation { |name| where(name: name) }
+      #       end
+      #     end
+      #
+      # @return [Symbol] view method name
+      #
+      # @api public
+      def view(id, *args, &block)
+        __dsl__(DSL::View, id: id, args: args, &block)
+        id
       end
 
       # Define associations for a relation
@@ -137,13 +190,13 @@ module ROM
       # Configures a plugin for a specific adapter to be enabled for all relations
       #
       # @example
-      #   config = ROM::Configuration.new(:sql, 'sqlite::memory')
+      #   setup = ROM::Setup.new(:sql, 'sqlite::memory')
       #
-      #   config.plugin(:sql, relations: :instrumentation) do |p|
+      #   setup.plugin(:sql, relations: :instrumentation) do |p|
       #     p.notifications = MyNotificationsBackend
       #   end
       #
-      #   config.plugin(:sql, relations: :pagination)
+      #   setup.plugin(:sql, relations: :pagination)
       #
       # @param [Symbol] adapter The adapter identifier
       # @param [Hash<Symbol=>Symbol>] spec Component identifier => plugin identifier
@@ -151,19 +204,27 @@ module ROM
       # @return [Plugin]
       #
       # @api public
-      def plugin(adapter, spec, &block)
-        type, name = spec.flatten(1)
+      def plugin(*args, &block)
+        case args.size
+        when 2
+          adapter, spec = args
+          type, name = spec.flatten(1)
 
-        # TODO: plugin types are singularized, so this is not consistent
-        #       with the configuration DSL for plugins that uses plural
-        #       names of the components - this should be unified
-        plugin = ROM
-          .plugins[Inflector.singularize(type)].adapter(adapter).fetch(name)
-          .configure(&block)
+          # TODO: plugin types are singularized, so this is not consistent
+          #       with the configuration DSL for plugins that uses plural
+          #       names of the components - this should be unified
+          plugin = ROM
+            .plugins[Inflector.singularize(type)].adapter(adapter).fetch(name)
+            .configure(&block)
 
-        config.component.plugins << plugin
+          config.component.plugins << plugin
 
-        plugin
+          plugin
+        when 1
+          plugin(self.adapter, *args)
+        else
+          raise ArgumentError, "+plugin+ accepts either 1 or 2 arguments (#{args.size} given)"
+        end
       end
 
       # @api public
@@ -179,11 +240,14 @@ module ROM
 
         if klass.nested && block
           dsl = klass.new(provider: self, config: type_config)
+          dsl.enable_plugins
           dsl.configure
           dsl.instance_eval(&block)
           dsl
         else
-          klass.new(provider: self, config: type_config, block: block).()
+          dsl = klass.new(provider: self, config: type_config, block: block)
+          dsl.enable_plugins
+          dsl.()
         end
       end
     end

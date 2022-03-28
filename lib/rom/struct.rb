@@ -25,7 +25,7 @@ module ROM
   # pre-define the parent class.
   #
   # @example accessing relation struct model
-  #   rom = ROM.runtime(:sql, 'sqlite::memory') do |conf|
+  #   rom = ROM.setup(:sql, 'sqlite::memory') do |conf|
   #     conf.default.create_table(:users) do
   #       primary_key :id
   #       column :name, String
@@ -72,16 +72,7 @@ module ROM
   #
   # @api public
   class Struct < Dry::Struct
-    MissingAttribute = Class.new(NameError) do
-      def initialize(&block)
-        super
-        @message_proc = block
-      end
-
-      def message
-        @message_proc.call
-      end
-    end
+    MissingAttribute = Class.new(NameError)
 
     # Return attribute value
     #
@@ -102,7 +93,7 @@ module ROM
     def method_missing(*)
       super
     rescue NameError => e
-      raise MissingAttribute.new { "#{e.message} (attribute not loaded?)" }
+      raise MissingAttribute.new("#{e.message} (attribute not loaded?)")
     end
   end
 end

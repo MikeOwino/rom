@@ -14,7 +14,7 @@ module ROM
     #
     # @api public
     class Core
-      include Dry::Effects.Reader(:resolver)
+      include Dry::Effects.Reader(:registry)
 
       extend Initializer
       extend Dry::Core::ClassAttributes
@@ -38,7 +38,7 @@ module ROM
       option :config, type: Types.Instance(Dry::Configurable::Config)
 
       # @!attribute [r] gateway
-      #   @return [Proc] Optional dataset evaluation block
+      #   @return [Proc] Optional component evaluation block
       option :block, type: Types.Interface(:to_proc), optional: true
 
       # @api public
@@ -51,7 +51,6 @@ module ROM
         config.abstract
       end
       alias_method :abstract?, :abstract
-
 
       # Default container key
       #
@@ -80,16 +79,6 @@ module ROM
       end
 
       # @api public
-      def trigger(event, payload)
-        resolver.trigger("configuration.#{event}", payload)
-      end
-
-      # @api public
-      def notifications
-        resolver.notifications
-      end
-
-      # @api public
       def inflector
         config.inflector
       end
@@ -106,29 +95,53 @@ module ROM
 
       # @api private
       def apply_plugins
-        plugins.each do |plugin|
-          plugin.apply_to(constant)
+        already_applied = plugins.reject(&:applied?).map do |plugin|
+          plugin.enable(constant) unless plugin.enabled?
+          plugin.apply unless plugin.applied?
+          plugin.name
         end
+
+        apply_external_plugins(gateway_plugins, already_applied) if gateway?
+        apply_external_plugins(provider_plugins, already_applied)
       end
 
-      # @api public
+      # @api private
+      def apply_external_plugins(plugins, already_applied)
+        plugins
+          .reject { |plugin| already_applied.include?(plugin.name) }
+          .each { |external_plugin|
+            config.plugins << external_plugin.configure.enable(constant).apply
+          }
+      end
+
+      # @api private
       def plugins
-        resolver.plugins.select { |plugin| plugin.type == type }
+        config.plugins.select { |plugin| plugin.type == type }
+      end
+
+      # @api private
+      def gateway_plugins
+        gateway.config.plugins.select { |plugin| plugin.type == type }
+      end
+
+      # @api private
+      def provider_plugins
+        provider.config.component.plugins.select { |plugin| plugin.type == type }
       end
 
       # @api public
       def plugin_options
-        plugins.map(&:config).map(&:to_hash).reduce(:merge) || EMPTY_HASH
+        plugins.map(&:plugin_options).reduce(:merge) || EMPTY_HASH
       end
 
       # @api public
       def gateway?
-        resolver.gateways.key?(config[:gateway])
+        registry.gateways.key?(config[:gateway])
       end
 
       # @api public
       def gateway
-        resolver.gateways[config[:gateway]]
+        registry.gateways[config[:gateway]]
       end
     end
   end

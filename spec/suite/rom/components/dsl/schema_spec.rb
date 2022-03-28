@@ -3,23 +3,23 @@
 require "rom/core"
 
 RSpec.describe ROM::Components::DSL, "#schema" do
-  subject(:runtime) do
-    ROM::Runtime.new
+  subject(:setup) do
+    ROM::Setup.new
   end
 
   let(:schema) do
-    runtime.resolver["schemas.users"]
+    setup.registry["schemas.users"]
   end
 
   it "defines an empty schema by default" do
-    runtime.schema(:users)
+    setup.schema(:users)
 
     expect(schema.name.dataset).to be(:users)
     expect(schema).to be_empty
   end
 
   it "defines an empty schema with attributes" do
-    runtime.schema(:users) do
+    setup.schema(:users) do
       attribute(:id, Types::Integer)
       attribute(:name, Types::String)
     end
@@ -30,10 +30,20 @@ RSpec.describe ROM::Components::DSL, "#schema" do
 
     expect(id).to be_a(ROM::Attribute)
     expect(id.primitive).to eql(Integer)
-    expect(id.meta[:source]).to be(:users)
+    expect(id.meta[:source].relation).to be(:users)
 
     expect(name).to be_a(ROM::Attribute)
     expect(name.primitive).to eql(String)
-    expect(name.meta[:source]).to be(:users)
+    expect(name.meta[:source].relation).to be(:users)
+  end
+
+  it "uses default options from config" do
+    inferrer = double(:inferrer)
+
+    setup.schema(:users) do
+      config.options[:primary_key_name] = :foo
+    end
+
+    expect(schema.primary_key_name).to be(:foo)
   end
 end

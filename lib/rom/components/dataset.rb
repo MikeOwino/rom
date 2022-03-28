@@ -21,7 +21,7 @@ module ROM
 
       # @api private
       def blocks
-        [*datasets.map(&:block), block].compact
+        [*dataset_components.map(&:block), block].compact
       end
 
       # @api adapter
@@ -29,21 +29,31 @@ module ROM
         config.adapter
       end
 
+      # @api adapter
+      def relation_id
+        config.relation_id
+      end
+
       private
 
       # @api private
-      def datasets
+      # rubocop:disable Metrics/AbcSize
+      memoize def schema
+        if id == relation_id
+          registry.schemas[id] if registry.schemas.key?(id)
+        elsif relation_id
+          registry.fetch("schemas.#{relation_id}.#{id}") {
+            registry.fetch("schemas.#{relation_id}")
+          }
+        elsif registry.schemas.key?(id)
+          registry.schemas[id]
+        end
+      end
+      # rubocop:enable Metrics/AbcSize
+
+      # @api private
+      memoize def dataset_components
         provider.components.datasets(abstract: true, adapter: adapter)
-      end
-
-      # @api private
-      def schema
-        resolver.schemas[schema_key] if schema_key
-      end
-
-      # @api private
-      def schema_key
-        resolver.components.get(:schemas, dataset: id)&.key
       end
     end
   end

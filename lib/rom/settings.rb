@@ -3,6 +3,7 @@
 require_relative "support/inflector"
 require_relative "support/configurable"
 
+# rubocop:disable Metrics/ModuleLength
 module ROM
   extend Configurable
 
@@ -19,12 +20,14 @@ module ROM
   # Gateway defaults
   setting :gateway do
     setting :type, default: :gateway
+    setting :abstract
     setting :id, default: :default
     setting :namespace, default: "gateways"
     setting :adapter
     setting :logger
     setting :args, default: EMPTY_ARRAY, constructor: :dup.to_proc
     setting :opts, default: EMPTY_HASH, constructor: :dup.to_proc
+    setting :plugins, default: EMPTY_ARRAY, inherit: true
   end
 
   # Dataset defaults
@@ -32,15 +35,18 @@ module ROM
     setting :type, default: :dataset
     setting :abstract
     setting :id
+    setting :relation_id
     setting :namespace, default: "datasets"
     setting :adapter
     setting :gateway
+    setting :plugins, default: EMPTY_ARRAY, inherit: true
   end
 
   # Schema defaults
   setting :schema do
     setting :type, default: :schema
     setting :id
+    setting :abstract
     setting :namespace, default: "schemas", join: true
     setting :dataset
     setting :as # TODO: move to rom/compat
@@ -55,19 +61,30 @@ module ROM
     setting :inferrer
     setting :attributes, default: EMPTY_ARRAY, constructor: :dup.to_proc
     setting :plugins, default: EMPTY_ARRAY, inherit: true
+    setting :options, default: EMPTY_HASH, constructor: :dup.to_proc
   end
 
   # Relation defaults
   setting :relation do
     setting :type, default: :relation
     setting :abstract
-    setting :id
+    setting :id, default: :anonymous
     setting :infer_id_from_class, inherit: true
     setting :namespace, default: "relations"
     setting :dataset
     setting :adapter
     setting :inflector
     setting :gateway
+    setting :plugins, default: EMPTY_ARRAY, inherit: true
+  end
+
+  # Relation view defaults
+  setting :view do
+    setting :type, default: :view
+    setting :abstract
+    setting :id
+    setting :namespace, default: "views", join: true
+    setting :args, default: [].freeze
     setting :plugins, default: EMPTY_ARRAY, inherit: true
   end
 
@@ -80,6 +97,7 @@ module ROM
     setting :adapter
     setting :as
     setting :name
+    setting :abstract
     setting :relation
     setting :source
     setting :target
@@ -88,26 +106,31 @@ module ROM
     setting :result
     setting :view
     setting :override
-    setting :combine_keys
+    setting :combine_keys, default: {}
+    setting :plugins, default: EMPTY_ARRAY, inherit: true
   end
 
   # Command defaults
   setting :command do
     setting :type, default: :command
+    setting :abstract
     setting :id
     setting :namespace, default: "commands", join: true
     setting :relation
     setting :adapter
     setting :gateway
+    setting :plugins, default: EMPTY_ARRAY, inherit: true
   end
 
   # Command defaults
   setting :mapper do
     setting :type, default: :mapper
+    setting :abstract
     setting :id
     setting :namespace, default: "mappers", join: true
     setting :relation
     setting :adapter
+    setting :plugins, default: EMPTY_ARRAY, inherit: true
   end
 
   # @api private
@@ -115,3 +138,4 @@ module ROM
     _settings
   end
 end
+# rubocop:enable Metrics/ModuleLength
